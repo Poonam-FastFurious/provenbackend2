@@ -6,7 +6,8 @@ const app = express();
 
 app.use(
   cors({
-    origin: "*",
+     origin: "https://provenadmin.brandbell.in",
+    credentials: true,
   })
 );
 
