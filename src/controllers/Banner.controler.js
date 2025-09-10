@@ -96,19 +96,14 @@ const deleteBanner = asyncHandler(async (req, res) => {
   try {
     const { id } = req.body; // Assuming id is passed as a query parameter
 
-    console.log("Deleting banner with ID:", id);
-
     // Find the banner by id and delete it
     const deletedBanner = await Banner.findByIdAndDelete(id);
 
     if (!deletedBanner) {
-      console.log("Banner not found with ID:", id);
       return res
         .status(404)
         .json({ success: false, message: "Banner not found" });
     }
-
-    console.log("Banner deleted successfully with ID:", id);
 
     return res.json({
       success: true,

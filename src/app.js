@@ -13,6 +13,7 @@ app.use(cookieParser());
 
 // Routes import
 
+import dashboard from "./Module/Dashboard/dashboard.routes.js";
 import adminrouter from "./routes/Admin.routes.js";
 import userrouter from "./routes/user.routes.js";
 import tax from "./routes/tax.routes.js";
@@ -42,8 +43,10 @@ import Inquiry from "./routes/Inquiry.routes.js";
 import review from "./routes/Review.routes.js";
 import search from "./routes/Search.routes.js";
 import Storelocation from "./routes/StoreLocation.routes.js";
+import ordernotification from "./routes/Ordernotification.routes.js";
 //routes declearetion
 
+app.use("/api/v1/dashboard", dashboard);
 app.use("/api/v1/admin", adminrouter);
 app.use("/api/v1/user", userrouter);
 app.use("/api/v1/tax", tax);
@@ -54,6 +57,7 @@ app.use("/api/v1/Banner", Banner);
 app.use("/api/v1/Product", Product);
 app.use("/api/v1/cart", cart);
 app.use("/api/v1/order", Order);
+app.use("/api/v1/ordernotification", ordernotification);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/privacy", privacy);
 app.use("/api/v1/terms", termscondtion);

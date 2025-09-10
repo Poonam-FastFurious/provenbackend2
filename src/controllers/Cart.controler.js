@@ -16,7 +16,6 @@ const addToCart = asyncHandler(async (req, res) => {
     throw new ApiError(401, "User not authenticated");
   }
 
-
   // Check if the product exists
   const product = await Product.findById(productId);
   if (!product) {
@@ -87,9 +86,7 @@ const addToCart = asyncHandler(async (req, res) => {
 });
 
 const getCart = asyncHandler(async (req, res) => {
-  console.log("getCart route hit");
   if (!req.user || !req.user._id) {
-    console.log("User not authenticated");
     throw new ApiError(401, "User not authenticated");
   }
 
@@ -100,7 +97,6 @@ const getCart = asyncHandler(async (req, res) => {
   });
 
   if (!cart) {
-    console.log("Cart not found");
     res.status(404).json({
       success: false,
       message: "Cart not found",

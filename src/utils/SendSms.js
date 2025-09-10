@@ -18,7 +18,6 @@
 //     if (response.data.includes("failure")) {
 //       throw new Error("Failed to send SMS");
 //     }
-//     console.log(`OTP sent to ${mobile}`);
 //   } catch (error) {
 //     console.error("Error sending SMS:", error);
 //     throw new Error("Failed to send OTP");

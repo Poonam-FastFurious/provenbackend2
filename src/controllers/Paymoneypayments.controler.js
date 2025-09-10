@@ -8,7 +8,6 @@ export const initiatePayment = async (req, res) => {
     const { txnid, amount, productinfo, firstname, email, userId } = req.body;
 
     // Debugging - Log request body to ensure all fields are present
-    console.log("Request body:", req.body);
 
     if (!userId) {
       return res.status(400).json({ error: "User ID is required" });

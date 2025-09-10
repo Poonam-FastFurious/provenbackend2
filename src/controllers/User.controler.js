@@ -51,23 +51,23 @@ const registerUser = asyncHandler(async (req, res, next) => {
   }
 
   // Check if a user with the provided email already exists
-   // Check if a user with the provided email already exists
-   const existingUserByEmail = await User.findOne({ email });
-   if (existingUserByEmail) {
-     return res.status(409).json({
-       success: false,
-       message: "User with this email already exists",
-     });
-   }
+  // Check if a user with the provided email already exists
+  const existingUserByEmail = await User.findOne({ email });
+  if (existingUserByEmail) {
+    return res.status(409).json({
+      success: false,
+      message: "User with this email already exists",
+    });
+  }
 
-   // Check if a user with the provided mobile number already exists
-   const existingUserByMobile = await User.findOne({ mobile });
-   if (existingUserByMobile) {
-     return res.status(409).json({
-       success: false,
-       message: "User with this mobile number already exists",
-     });
-   }
+  // Check if a user with the provided mobile number already exists
+  const existingUserByMobile = await User.findOne({ mobile });
+  if (existingUserByMobile) {
+    return res.status(409).json({
+      success: false,
+      message: "User with this mobile number already exists",
+    });
+  }
 
   // Create OTP and set expiration time
   const otp = generateOTP();
@@ -100,8 +100,6 @@ const verifyOTP = asyncHandler(async (req, res) => {
   if (!mobile || !otp) {
     throw new ApiError(400, "Mobile number and OTP are required");
   }
-  console.log("Mobile:", mobile);
-  console.log("OTP:", otp);
 
   // Find the user by mobile number
   const user = await User.findOne({ mobile });
@@ -129,22 +127,21 @@ const verifyOTP = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email) {
-    throw new ApiError(400, "username or email is required");
-  }
+  if (!email) throw new ApiError(400, "Email is required");
+  if (!password) throw new ApiError(400, "Password is required");
 
-  const user = await User.findOne({ email });
+  // fetch with password
+  const user = await User.findOne({ email }).select("+password");
 
-  if (!user) {
-    throw new ApiError(404, "User does not exist");
-  }
+  if (!user) throw new ApiError(404, "User does not exist");
 
+  // validate password
   const isPasswordValid = await user.isPasswordCorrect(password);
-
   if (!isPasswordValid) {
     throw new ApiError(401, "Invalid user credentials");
   }
 
+  // generate tokens
   const { accessToken, refreshToken } = await generateAccessAndRefereshTokens(
     user._id
   );
@@ -165,12 +162,8 @@ const loginUser = asyncHandler(async (req, res) => {
     .json(
       new ApiResponse(
         200,
-        {
-          user: loggedInUser,
-          accessToken,
-          refreshToken,
-        },
-        "User logged In Successfully"
+        { user: loggedInUser, accessToken, refreshToken },
+        "User logged in successfully"
       )
     );
 });

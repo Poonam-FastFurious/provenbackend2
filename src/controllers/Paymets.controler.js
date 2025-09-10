@@ -76,7 +76,6 @@ export const verifyPayment = async (req, res) => {
       payment.status = "paid";
       await payment.save();
 
-      console.log("Payment verified and updated successfully:", payment);
       return res
         .status(200)
         .json({ status: "Payment verified successfully", payment });

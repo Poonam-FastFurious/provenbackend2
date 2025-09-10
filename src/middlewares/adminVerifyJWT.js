@@ -14,16 +14,13 @@ export const adminVerifyJWT = asyncHandler(async (req, _, next) => {
   }
 
   try {
-    console.log("Token received:", token);
     const decodedToken = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
-    console.log("Decoded Token:", decodedToken);
 
     if (!decodedToken?._id) {
       console.error("Unauthorized request: Invalid token structure");
       throw new ApiError(401, "Unauthorized request: Invalid token structure");
     }
 
-    console.log("Fetching admin with ID:", decodedToken._id);
     const admin = await Admin.findById(decodedToken._id).select(
       "-password -refreshToken"
     );

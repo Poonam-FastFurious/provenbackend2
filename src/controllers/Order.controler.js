@@ -3,6 +3,8 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { ApiError } from "../utils/ApiError.js";
 import { Order } from "../models/Order.model.js"; // Assuming this is the correct path to your Order model
 import { User } from "../models/User.model.js";
+import { Admin } from "../models/Admin.model.js";
+import { OrderNotification } from "../models/orderNotification.model.js";
 
 const placeOrder = asyncHandler(async (req, res) => {
   const { customerId, products, totalAmount, shippingInfo, paymentInfo } =
@@ -35,6 +37,14 @@ const placeOrder = asyncHandler(async (req, res) => {
       paymentInfo,
     });
 
+    const admins = await Admin.find({}); // all admins
+    for (const admin of admins) {
+      await OrderNotification.create({
+        user: admin._id, // notification belongs to admin
+        order: order._id,
+        message: `New order ${order.orderID} has been placed.`,
+      });
+    }
     return res
       .status(201)
       .json(new ApiResponse(201, order, "Order placed successfully"));
@@ -43,10 +53,31 @@ const placeOrder = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Something went wrong while placing the order");
   }
 });
+
 const getAllOrders = asyncHandler(async (req, res) => {
   try {
-    // Fetch all orders from the database, populate customer details
-    const orders = await Order.find().populate("customer", "fullName email");
+    const { startDate, endDate, search } = req.query;
+
+    let filter = {};
+
+    if (startDate && endDate) {
+      filter.createdAt = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate),
+      };
+    }
+
+    if (search) {
+      filter.$or = [
+        { orderID: { $regex: search, $options: "i" } },
+        { "customer.fullName": { $regex: search, $options: "i" } },
+      ];
+    }
+
+    const orders = await Order.find(filter).populate(
+      "customer",
+      "fullName email"
+    );
 
     return res
       .status(200)
@@ -56,9 +87,10 @@ const getAllOrders = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Something went wrong while fetching orders");
   }
 });
+
 const getOrderById = async (req, res) => {
   const { id } = req.params; // Extract the order ID from request parameters
-  console.log("Received order ID:", id);
+
   try {
     // Find the order by ID and populate the user, product, and address details
     const order = await Order.findById(id)
@@ -74,8 +106,6 @@ const getOrderById = async (req, res) => {
         select:
           "fullName phoneNumber streetAddress city state postalCode country addressType", // Select relevant fields for the address
       });
-
-    console.log("Retrieved order:", order);
 
     // If order is not found, return an error response
     if (!order) {
