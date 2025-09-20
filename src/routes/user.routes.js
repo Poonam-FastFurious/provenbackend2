@@ -12,13 +12,13 @@ import {
   getUserProfile,
   forgotPassword,
   resetPassword,
-  requestOTP,
   verifyOTPAndLogin,
   verifyOTP,
 } from "../controllers/User.controler.js";
 
 import { verifyJWT } from "../middlewares/auth.middlwares.js";
 import { upload } from "../middlewares/FileUpload.middlwares.js";
+import { requestOTP } from "../Modules/Sendotp.controler.js";
 
 const router = Router();
 
@@ -33,6 +33,7 @@ router.route("/register").post(
 );
 
 router.route("/login").post(loginUser);
+router.post("/send-otp", requestOTP);
 
 //secured routes
 router.route("/logout").post(verifyJWT, logoutUser);

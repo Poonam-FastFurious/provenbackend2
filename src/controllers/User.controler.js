@@ -438,49 +438,49 @@ const resetPassword = async (req, res) => {
   }
 };
 
-const requestOTP = async (req, res) => {
-  try {
-    const { mobile } = req.body;
+// const requestOTP = async (req, res) => {
+//   try {
+//     const { mobile } = req.body;
 
-    if (!mobile) {
-      throw new ApiError(400, "Mobile number is required");
-    }
+//     if (!mobile) {
+//       throw new ApiError(400, "Mobile number is required");
+//     }
 
-    const user = await User.findOne({ mobile });
+//     const user = await User.findOne({ mobile });
 
-    if (!user) {
-      throw new ApiError(
-        404,
-        "Your mobile number does not exist. Please sign up"
-      );
-    }
+//     if (!user) {
+//       throw new ApiError(
+//         404,
+//         "Your mobile number does not exist. Please sign up"
+//       );
+//     }
 
-    const otp = generateOTP();
-    user.otp = otp;
-    user.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
-    await user.save();
+//     const otp = generateOTP();
+//     user.otp = otp;
+//     user.otpExpires = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
+//     await user.save();
 
-    await sendSMS(user.mobile, otp);
+//     await sendSMS(user.mobile, otp);
 
-    return res
-      .status(200)
-      .json(new ApiResponse(200, null, "OTP sent to your mobile"));
-  } catch (error) {
-    console.error("Error during OTP request:", error);
+//     return res
+//       .status(200)
+//       .json(new ApiResponse(200, null, "OTP sent to your mobile"));
+//   } catch (error) {
+//     console.error("Error during OTP request:", error);
 
-    // Handle specific errors
-    if (error instanceof ApiError) {
-      return res
-        .status(error.statusCode)
-        .json({ success: false, message: error.message });
-    }
+//     // Handle specific errors
+//     if (error instanceof ApiError) {
+//       return res
+//         .status(error.statusCode)
+//         .json({ success: false, message: error.message });
+//     }
 
-    // Handle other unexpected errors
-    return res
-      .status(500)
-      .json({ success: false, message: "Internal server error" });
-  }
-};
+//     // Handle other unexpected errors
+//     return res
+//       .status(500)
+//       .json({ success: false, message: "Internal server error" });
+//   }
+// };
 
 const verifyOTPAndLogin = asyncHandler(async (req, res) => {
   const generateAccessAndRefereshTokens = async (userId) => {
@@ -582,7 +582,7 @@ export {
   getUserProfile,
   forgotPassword,
   resetPassword,
-  requestOTP,
+  // requestOTP,
   verifyOTPAndLogin,
   verifyOTP,
 };
