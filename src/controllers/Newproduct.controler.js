@@ -5,150 +5,133 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { uploadOnCloudinary } from "../utils/Cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { SearchData } from "../models/Search.modal.js";
+
 const addProduct = asyncHandler(async (req, res) => {
   try {
-    if (!req.body || !req.files) {
-      throw new ApiError(400, "Request body or files are missing");
-    }
-
     const {
       title,
       description,
-      price,
-      discount,
-      cutPrice,
       categories,
       tags,
-      sku,
       shortDescription,
-      stocks,
       youtubeVideoLink,
       flipkarturl,
       amazonurl,
-      
+      hasVariants,
+      variants, // JSON array expected if hasVariants is true
+      sku,
+      price,
+      cutPrice,
+      discount,
+      stocks,
     } = req.body;
 
     // Validate required fields
-    if (
-      ![
-        title,
-        description,
-        price,
-        stocks,
-        sku,
-        categories,
-        flipkarturl,
-        amazonurl,
-      ].every((field) => field && field.trim())
-    ) {
-      throw new ApiError(400, "All required fields must be filled");
+    if (!title || !description || !categories || !req.files?.image) {
+      throw new ApiError(400, "Required fields missing");
     }
 
-    // Ensure stocks and price are numbers
-    const parsedStocks = parseInt(stocks, 10);
-    const parsedPrice = parseFloat(price);
-
-    if (isNaN(parsedStocks) || isNaN(parsedPrice)) {
-      throw new ApiError(400, "Stocks and price must be valid numbers");
-    }
-
-    // Validate SKU format (example: SKU must be alphanumeric)
-    const skuRegex = /^[A-Za-z0-9-]+$/;
-    if (!skuRegex.test(sku)) {
-      throw new ApiError(
-        400,
-        "SKU must be alphanumeric and follow the required format"
-      );
-    }
-
-    // Validate YouTube video URL (basic validation)
-    const youtubeRegex =
-      /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.?be)\/.+$/;
-    if (youtubeVideoLink && !youtubeRegex.test(youtubeVideoLink)) {
-      throw new ApiError(400, "Invalid YouTube video URL");
-    }
-
-    // Check for existing product by SKU
-    const existingProduct = await Product.findOne({ sku });
-    if (existingProduct) {
-      throw new ApiError(409, "Product with the same SKU already exists");
-    }
-
-    // Fetch existing category from the database
+    // Validate category
     const existingCategory = await Category.findOne({
       categoriesTitle: categories,
       status: "active",
     });
-
-    if (!existingCategory) {
+    if (!existingCategory)
       throw new ApiError(400, `Invalid category: ${categories}`);
-    }
 
-    // Handle image and thumbnail upload
-    const imageLocalPath = req.files?.image?.[0]?.path;
-    const thumbnailFiles = req.files?.thumbnail;
-    const bannerFiles = req.files?.banners; // Handle banner files
-    if (!imageLocalPath || !thumbnailFiles || thumbnailFiles.length === 0) {
-      throw new ApiError(400, "Image and Thumbnail files are required");
-    }
-
-    const uploadedImage = await uploadOnCloudinary(imageLocalPath);
-    const uploadedThumbnails = await Promise.all(
-      thumbnailFiles.map((file) => uploadOnCloudinary(file.path))
-    );
-    const uploadedBanners = bannerFiles
+    // Upload images
+    const uploadedImage = await uploadOnCloudinary(req.files.image[0].path);
+    const uploadedThumbnails = req.files.thumbnail
       ? await Promise.all(
-          bannerFiles.map((file) => uploadOnCloudinary(file.path))
+          req.files.thumbnail.map((f) => uploadOnCloudinary(f.path))
+        )
+      : [];
+    const uploadedBanners = req.files.banners
+      ? await Promise.all(
+          req.files.banners.map((f) => uploadOnCloudinary(f.path))
         )
       : [];
 
-    if (!uploadedImage || !uploadedThumbnails.length) {
-      throw new ApiError(400, "Failed to upload image or thumbnails");
-    }
-
-    // Validate and handle tags
-    const parsedTags = Array.isArray(tags) ? tags : [tags]; // Ensure tags is an array
-
-    // Create a new product
-    const newProduct = await Product.create({
+    let productData = {
       title,
       description,
-      price: parsedPrice,
-      discount,
-      cutPrice,
       categories,
-      tags: parsedTags,
-      sku,
+      tags: Array.isArray(tags) ? tags : [tags],
       shortDescription,
-      image: uploadedImage.url,
-      thumbnail: uploadedThumbnails.map((thumbnail) => thumbnail.url),
-      stocks: parsedStocks,
       youtubeVideoLink,
-      amazonurl,
       flipkarturl,
-      banners: uploadedBanners.map((banner) => banner.url),
-    });
+      amazonurl,
+      image: uploadedImage.url,
+      thumbnail: uploadedThumbnails.map((t) => t.url),
+      banners: uploadedBanners.map((b) => b.url),
+      hasVariants: hasVariants === "true" || hasVariants === true, // ensure boolean
+    };
 
-    // Return successful response
-    return res.status(201).json({
-      success: true,
-      message: "Product created successfully",
-      product: newProduct.toObject(),
-    });
-  } catch (error) {
-    console.error("Error during product creation:", error);
+    if (productData.hasVariants) {
+      // Parse variants
+      let parsedVariants =
+        typeof variants === "string" ? JSON.parse(variants) : variants;
+      if (!Array.isArray(parsedVariants) || parsedVariants.length === 0) {
+        throw new ApiError(400, "Variants are required and must be an array");
+      }
 
-    if (error instanceof ApiError) {
-      return res.status(error.statusCode).json({
-        success: false,
-        message: error.message,
+      // Validate each variant
+      parsedVariants.forEach((v, index) => {
+        if (!v.sku || !v.price || !v.stocks) {
+          throw new ApiError(
+            400,
+            `Variant at index ${index} is missing required fields`
+          );
+        }
+        v.price = parseFloat(v.price);
+        v.stocks = parseInt(v.stocks, 10);
+        v.cutPrice = v.cutPrice ? parseFloat(v.cutPrice) : 0;
+        v.discount = v.discount || "";
+        if (isNaN(v.price) || isNaN(v.stocks)) {
+          throw new ApiError(
+            400,
+            `Invalid price or stocks for variant at index ${index}`
+          );
+        }
       });
+
+      productData.variants = parsedVariants;
+    } else {
+      // Single product: store SKU, price, cutPrice, discount, stocks directly
+      if (!sku || !price || !stocks) {
+        throw new ApiError(
+          400,
+          "SKU, price, and stocks are required for single product"
+        );
+      }
+      productData.sku = sku;
+      productData.price = parseFloat(price);
+      productData.cutPrice = cutPrice ? parseFloat(cutPrice) : 0;
+      productData.discount = discount || "";
+      productData.stocks = parseInt(stocks, 10);
+      if (isNaN(productData.price) || isNaN(productData.stocks)) {
+        throw new ApiError(400, "Invalid price or stocks for single product");
+      }
     }
 
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
+    // Create product
+    const newProduct = await Product.create(productData);
+
+    res.status(201).json({
+      success: true,
+      message: "Product created",
+      product: newProduct,
     });
+  } catch (error) {
+    console.error("Error:", error);
+    if (error instanceof ApiError) {
+      return res
+        .status(error.statusCode)
+        .json({ success: false, message: error.message });
+    }
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 });
 
@@ -275,18 +258,18 @@ const updateProduct = asyncHandler(async (req, res) => {
       shortDescription,
       stocks,
       youtubeVideoLink,
-      amazonurl, // New field for Amazon URL
+      amazonurl,
       flipkarturl,
+      hasVariants,
+      variants, // JSON array if hasVariants is true
     } = req.body;
 
-    // Check if product exists
+    // Find existing product
     const product = await Product.findById(id);
-    if (!product) {
-      throw new ApiError(404, "Product not found");
-    }
+    if (!product) throw new ApiError(404, "Product not found");
 
-    // Validate SKU if provided
-    if (sku) {
+    // Validate SKU if single product
+    if (!hasVariants && sku) {
       const existingProduct = await Product.findOne({ sku });
       if (existingProduct && existingProduct._id.toString() !== id) {
         throw new ApiError(409, "Product with the same SKU already exists");
@@ -302,17 +285,16 @@ const updateProduct = asyncHandler(async (req, res) => {
       if (!existingCategory) {
         throw new ApiError(400, `Invalid category: ${categories}`);
       }
+      product.categories = categories;
     }
 
-    // Handle image and thumbnail updates if files are provided
+    // Handle file uploads
     if (req.files) {
       const { image, thumbnail, banners } = req.files;
 
       if (image) {
         const uploadedImage = await uploadOnCloudinary(image[0].path);
-        if (!uploadedImage) {
-          throw new ApiError(400, "Failed to upload image");
-        }
+        if (!uploadedImage) throw new ApiError(400, "Failed to upload image");
         product.image = uploadedImage.url;
       }
 
@@ -320,41 +302,69 @@ const updateProduct = asyncHandler(async (req, res) => {
         const uploadedThumbnails = await Promise.all(
           thumbnail.map((file) => uploadOnCloudinary(file.path))
         );
-        if (!uploadedThumbnails.length) {
-          throw new ApiError(400, "Failed to upload thumbnails");
-        }
-        product.thumbnail = uploadedThumbnails.map(
-          (thumbnail) => thumbnail.url
-        );
+        product.thumbnail = uploadedThumbnails.map((t) => t.url);
       }
+
       if (banners) {
         const uploadedBanners = await Promise.all(
           banners.map((file) => uploadOnCloudinary(file.path))
         );
-        if (!uploadedBanners.length) {
-          throw new ApiError(400, "Failed to upload banners");
-        }
-        product.banners = uploadedBanners.map((banner) => banner.url);
+        product.banners = uploadedBanners.map((b) => b.url);
       }
     }
 
-    // Update product fields if they are provided
+    // Update general fields
     if (title) product.title = title;
     if (description) product.description = description;
-    if (price) product.price = parseFloat(price);
-    if (discount) product.discount = discount;
-    if (cutPrice) product.cutPrice = cutPrice;
-    if (categories) product.categories = categories;
     if (tags) product.tags = Array.isArray(tags) ? tags : [tags];
-    if (sku) product.sku = sku;
     if (shortDescription) product.shortDescription = shortDescription;
-    if (stocks) product.stocks = parseInt(stocks, 10);
     if (youtubeVideoLink) product.youtubeVideoLink = youtubeVideoLink;
     if (amazonurl) product.amazonurl = amazonurl;
     if (flipkarturl) product.flipkarturl = flipkarturl;
+    product.hasVariants = hasVariants === "true" || hasVariants === true;
+
+    // Handle variants
+    if (product.hasVariants) {
+      if (!variants)
+        throw new ApiError(400, "Variants are required for this product");
+      let parsedVariants =
+        typeof variants === "string" ? JSON.parse(variants) : variants;
+
+      parsedVariants.forEach((v, index) => {
+        if (!v.sku || !v.price || !v.stocks) {
+          throw new ApiError(
+            400,
+            `Variant at index ${index} is missing required fields`
+          );
+        }
+        v.price = parseFloat(v.price);
+        v.stocks = parseInt(v.stocks, 10);
+        v.cutPrice = v.cutPrice ? parseFloat(v.cutPrice) : 0;
+        v.discount = v.discount || "";
+      });
+
+      product.variants = parsedVariants;
+
+      // Clear single product fields
+      product.sku = undefined;
+      product.price = undefined;
+      product.stocks = undefined;
+      product.cutPrice = undefined;
+      product.discount = undefined;
+    } else {
+      // Single product fields
+      if (sku) product.sku = sku;
+      if (price) product.price = parseFloat(price);
+      if (stocks) product.stocks = parseInt(stocks, 10);
+      if (cutPrice) product.cutPrice = parseFloat(cutPrice);
+      if (discount) product.discount = discount;
+      // Clear variants
+      product.variants = [];
+    }
+
     await product.save();
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       message: "Product updated successfully",
       product: product.toObject(),
@@ -363,18 +373,17 @@ const updateProduct = asyncHandler(async (req, res) => {
     console.error("Error during product update:", error);
 
     if (error instanceof ApiError) {
-      return res.status(error.statusCode).json({
-        success: false,
-        message: error.message,
-      });
+      return res
+        .status(error.statusCode)
+        .json({ success: false, message: error.message });
     }
 
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   }
 });
+
 const buildQuery = (params) => {
   const query = {};
 

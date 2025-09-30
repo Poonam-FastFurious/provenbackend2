@@ -28,6 +28,6 @@ router.route("/edit").patch(
   editBanner
 );
 router.route("/delete").delete(deleteBanner);
-router.route("/allabnner").get(getallbanner);
+router.route("/allbanner").get(getallbanner);
 
 export default router;
