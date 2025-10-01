@@ -89,6 +89,7 @@ const orderSchema = new mongoose.Schema(
         },
       },
     ],
+    frontendUrl: String,
   },
   {
     timestamps: true, // Automatically adds createdAt and updatedAt fields

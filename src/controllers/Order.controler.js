@@ -27,6 +27,11 @@ const placeOrder = asyncHandler(async (req, res) => {
       throw new ApiError(404, "Customer not found");
     }
     // Create the order
+    const frontendUrl =
+      req.headers.origin ||
+      req.headers.referer ||
+      "https://default-frontend.com";
+    console.log("Detected frontend URL:", frontendUrl);
     const order = await Order.create({
       customer: customerId,
       customerName: customer.name,
@@ -35,7 +40,9 @@ const placeOrder = asyncHandler(async (req, res) => {
       totalAmount,
       shippingInfo,
       paymentInfo,
+      frontendUrl,
     });
+    console.log("Saved frontend URL:", order.frontendUrl);
 
     const admins = await Admin.find({}); // all admins
     for (const admin of admins) {
@@ -87,37 +94,41 @@ const getAllOrders = asyncHandler(async (req, res) => {
     throw new ApiError(500, "Something went wrong while fetching orders");
   }
 });
-
 const getOrderById = async (req, res) => {
-  const { id } = req.params; // Extract the order ID from request parameters
+  const { id } = req.params;
 
   try {
-    // Find the order by ID and populate the user, product, and address details
     const order = await Order.findById(id)
-      .populate("customer", "fullName email mobile") // Populate customer details
+      .populate("customer", "fullName email mobile")
       .populate({
-        path: "products.product", // Populate product details
-        model: "Product", // Correct model name
-        select: "title image stocks price categories", // Fields to select
+        path: "products.product",
+        model: "Product",
+        select: "title image stocks price categories sku", // slug nahi chahiye
       })
       .populate({
-        path: "shippingInfo.address", // Populate the shipping address details
-        model: "UserAddress", // Reference the correct address model
+        path: "shippingInfo.address",
+        model: "UserAddress",
         select:
-          "fullName phoneNumber streetAddress city state postalCode country addressType", // Select relevant fields for the address
+          "fullName phoneNumber streetAddress city state postalCode country addressType",
       });
 
-    // If order is not found, return an error response
     if (!order) {
       return res
         .status(404)
         .json({ success: false, message: "Order not found" });
     }
+    const baseUrl = order.frontendUrl || "https://default-frontend.com";
+    const orderWithUrls = order.toObject();
+    orderWithUrls.products = orderWithUrls.products.map((item) => ({
+      ...item,
+      product: {
+        ...item.product,
+        url: `${baseUrl}/Product/${item.product._id}`, // dynamic product URL
+      },
+    }));
 
-    // If order is found, return success response with order details
-    return res.status(200).json({ success: true, data: order });
+    return res.status(200).json({ success: true, data: orderWithUrls });
   } catch (error) {
-    // If any error occurs during retrieval, return an error response
     return res
       .status(500)
       .json({ success: false, message: "Internal server error" });
